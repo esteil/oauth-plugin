@@ -22,22 +22,24 @@ module OAuth
         def initialize(options={})
           @options={
               :interactive=>true,
-              :strategies => [:token,:two_legged]
+              :strategies => [:token,:two_legged],
+              :optional => false
             }.merge(options)
           @strategies = Array(@options[:strategies])
           @strategies << :interactive if @options[:interactive]
         end
         
         def filter(controller)
-          Authenticator.new(controller,@strategies).allow?
+          Authenticator.new(controller,@strategies, @options).allow?
         end
       end
       
       class Authenticator
-        attr_accessor :controller, :strategies, :strategy
-        def initialize(controller,strategies)
+        attr_accessor :controller, :strategies, :strategy, :options
+        def initialize(controller,strategies,options={})
           @controller = controller
           @strategies = strategies
+          @options    = options
         end
         
         def allow?
@@ -47,7 +49,10 @@ module OAuth
             @controller.send :current_user=, token.user if token
             true
           else
-            if @strategies.include?(:interactive) 
+            # Allow if optional is requested, and no oauth is present
+            if @options[:optional] && env['oauth.strategies'].to_a.empty?
+              true
+            elsif @strategies.include?(:interactive)
               controller.send :access_denied
             else
               controller.send :invalid_oauth_response
